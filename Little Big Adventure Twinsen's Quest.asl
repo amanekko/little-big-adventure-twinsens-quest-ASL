@@ -1,62 +1,93 @@
-// LBA Twinsen's Quest 
-// Tested with 1.1.2 #debb500
-
 state("LittleBigAdventureTwinsensQuest")
-{ 
-    int location: "UnityPlayer.dll", 0x1D205C0, 0x1F0, 0x168,  0x0,  0x78,  0x30,  0x8, 0x48;
+{
 }
- 
- 
-// Called on splitter loading
+
+startup
+{       
+    Assembly.Load(File.ReadAllBytes("Components/asl-help")).CreateInstance("Unity");
+    vars.Helper.LoadSceneManager = true;
+    vars.Helper.GameName = "Little Big Adventure - Twinsen's Quest";
+}
+
 init
 {
-    vars.oldReset = 9;
-    vars.reset = 0;
-    vars.start = 6;
-    vars.oldEnd = 5;
-    vars.end = 0;
+    vars.oldScene = "";
+    vars.currentScene = "";
+    vars.introFadeCount = 0; // Tracks the number of fades during the intro
+    vars.inIntro = false; // Tracks if the game is in intro
+
+
+	vars.Helper.TryLoad = (Func<dynamic, bool>)(mono =>
+	{
+        vars.Helper["m_lifePoints"] = mono.Make<int>("GameHandler", 1, "s_instance", "m_state", "m_lifePoints");
+        vars.Helper["m_playIntro"] = mono.Make<bool>("SceneHandler", 1, "s_instance", "m_playIntro");
+        vars.Helper["m_fadeEndTime"] = mono.Make<float>("SceneHandler", 1, "s_instance", "m_fadeEndTime");
+        
+	    return true;
+	});
 }
 
-// Game start, triggered after the intro cinematic when entering Twinsen's house scene
-start
-{    
-   if (old.location == vars.reset && current.location == vars.start)
-    { 
-        print("Start");        
-        return true;
-    }      
-}
- 
- 
-// Will reset the timer on the start of the intro cinematic (maybe change this in the future)
-reset
+update
 {
-    if (old.location == vars.oldReset && current.location == vars.reset)
+    vars.Helper.Update();
+    vars.Helper.MapPointers();
+
+    // Explicitly track old and current scenes to avoid ExpandoObject missing definition errors
+    vars.oldScene = vars.currentScene;
+    vars.currentScene = vars.Helper.Scenes.Active.Name == null ? "" : vars.Helper.Scenes.Active.Name;
+
+    if (vars.currentScene != vars.oldScene)
+    {       
+        print("[LBA TQ Autosplitter] Scene: " + vars.currentScene);
+    } 
+
+    // increment intro fade counter (when the screen fades out and back in)
+    if(current.m_fadeEndTime > 0 && old.m_fadeEndTime == 0 && vars.inIntro == true)
     {
-        print("Reset");
+        vars.introFadeCount++;
+        print("[LBA TQ Autosplitter] Intro Fade Count: " + vars.introFadeCount);
+    } 
+    // reset intro fade counter 
+    if(current.m_playIntro == true && old.m_playIntro == false)
+    {
+        vars.inIntro = true;        
+        vars.introFadeCount = 0;
+    }
+    // end intro when fade count reaches 2 (the 2nd fade has completed)
+    if (vars.introFadeCount == 2)
+    {
+        vars.inIntro = false;
+    }
+}
+
+split
+{
+    // stop the timer on fade time no longer 0 when we are in last scene (not ideal condition)
+    if(current.m_fadeEndTime > 0 && old.m_fadeEndTime == 0 && vars.currentScene == "11_113_mono3")
+    {
+        print("[LBA TQ Autosplitter] END");
         return true;
     } 
 }
- 
-// AutoSplits
-split
+
+start
 {
-    // Split end
-    if (old.location == vars.oldEnd && current.location == vars.end)
-    {
-        print("End");
+    // Start on the EXACT moment the 2nd fade sequence ENDS (goes from > 0 back to 0)
+    if (vars.introFadeCount == 2)
+    {        
+        vars.introFadeCount = 0;
+        print("[LBA TQ Autosplitter] START");
         return true;
     }
-
-    return false;     
 }
- 
-// Will print every location changes
-update
-{         
-    if (current.location != old.location)
+
+reset
+{
+    // Reset the timer and the fade counter ONLY when we just entered the intro 
+    // (Prevents the timer from instantly resetting if m_playIntro is still true when starting)
+    if(current.m_playIntro == true && old.m_playIntro == false)
     {
-        print("location: " + current.location);
+        print("[LBA TQ Autosplitter] RESET");
+        return true;
     }
 }
-
