@@ -19,7 +19,7 @@ init
 
 	vars.Helper.TryLoad = (Func<dynamic, bool>)(mono =>
 	{
-        vars.Helper["m_lifePoints"] = mono.Make<int>("GameHandler", 1, "s_instance", "m_state", "m_lifePoints");
+        vars.Helper["m_sceneID"] = mono.Make<int>("GameHandler", 1, "s_instance", "m_state", "m_sceneID");
         vars.Helper["m_playIntro"] = mono.Make<bool>("SceneHandler", 1, "s_instance", "m_playIntro");
         vars.Helper["m_fadeEndTime"] = mono.Make<float>("SceneHandler", 1, "s_instance", "m_fadeEndTime");
         
@@ -32,13 +32,12 @@ update
     vars.Helper.Update();
     vars.Helper.MapPointers();
 
-    // Explicitly track old and current scenes to avoid ExpandoObject missing definition errors
     vars.oldScene = vars.currentScene;
     vars.currentScene = vars.Helper.Scenes.Active.Name == null ? "" : vars.Helper.Scenes.Active.Name;
 
     if (vars.currentScene != vars.oldScene)
     {       
-        print("[LBA TQ Autosplitter] Scene: " + vars.currentScene);
+        print("[LBA TQ Autosplitter] Scene name: " + vars.currentScene);
     } 
 
     // increment intro fade counter (when the screen fades out and back in)
@@ -62,8 +61,8 @@ update
 
 split
 {
-    // stop the timer on fade time no longer 0 when we are in last scene (not ideal condition)
-    if(current.m_fadeEndTime > 0 && old.m_fadeEndTime == 0 && vars.currentScene == "11_113_mono3")
+    // stop the timer on fade time no longer 0 when we were in last scene (not ideal condition)
+    if(current.m_fadeEndTime > 0 && old.m_fadeEndTime == 0 && current.m_sceneID == 113 && old.m_sceneID == 113)
     {
         print("[LBA TQ Autosplitter] END");
         return true;
